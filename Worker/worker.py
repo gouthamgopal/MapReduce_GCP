@@ -194,10 +194,10 @@ class Worker:
         self.status = 'DONE'
         return
     
-    def getWorkStatus(self):
+    def checkWorkStatus(self):
         return self.status
 
-    def setStatus(self, status):
+    def setWorkStatus(self, status):
         self.status = status
 
 
