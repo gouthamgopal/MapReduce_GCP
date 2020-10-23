@@ -1,7 +1,10 @@
 #!/bin/bash
 sudo apt-get update
 
-mkdir Worker
+cd /home/ggopal
+git clone -b worker https://github.com/gouthamgopal/MapReduce_GCP.git
+cd MapReduce_GCP
 cd Worker
-git clone 
-echo 'Hi from starter script' > new.txt
+echo 'Worker logger file' > worker.log
+chmod u+x worker.log
+python3 worker.py

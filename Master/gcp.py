@@ -38,9 +38,7 @@ class GCP_API:
         
         imageSource = self.service.images().getFromFamily(project=self.config['GCP']['image_project'], family=self.config['GCP']['image_family']).execute()
         imageSourceLink = imageSource['selfLink']
-        with open('./test.json', 'r') as f:
-            data = json.load(f)
-        server_key_file = data
+
         config = {
             'name': name,
             'machineType': machine_type,
@@ -84,6 +82,8 @@ class GCP_API:
             except Exception as e:
                 print(str(e))
                 continue
+        
+        return self.getIPAddresses(project, zone, name)
 
     def delete_instance(self, project, zone, name):
         # credentials = service_account.Credentials.from_service_account_file(self.sa_file, scopes = self.scopes) 
