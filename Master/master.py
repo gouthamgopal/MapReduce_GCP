@@ -123,13 +123,18 @@ class MasterServer:
             logging.info('Creating worker node instance {0}.'.format(str(i)))
             worker_name = parser["worker"]["name"] + str(i)
             _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
+            print('external', external_ip)
             while True:
                 try:
+                    print('before worker client')
                     worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
-                
+                    print('worker client', worker_client)
+                    print(config['kv_client']['ip'])
+                    print(worker_client.getStatus(config["kv_client"]["ip"]))
                     if worker_client.getStatus(config["kv_client"]["ip"]) == 'OK':
                         break
-                except:
+                except Exception as e:
+                    print(str(e))
                     logging.info('Waiting for worker node {0} server to respond.'.format(str(i)))
                     time.sleep(10)
                     continue
