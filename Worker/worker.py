@@ -195,7 +195,7 @@ class Worker:
         return
     
     def checkWorkStatus(self):
-        return self.status
+        return self.status if self.status != None else 'IDLE'
 
     def setWorkStatus(self, status):
         self.status = status
