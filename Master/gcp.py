@@ -34,7 +34,7 @@ class GCP_API:
         else:
             startup_script = open(os.path.join(os.path.dirname(__file__), self.config['worker']['worker_startup_script_path']), 'r').read()
         
-        print(startup_script)
+        # print(startup_script)
         
         imageSource = self.service.images().getFromFamily(project=self.config['GCP']['image_project'], family=self.config['GCP']['image_family']).execute()
         imageSourceLink = imageSource['selfLink']

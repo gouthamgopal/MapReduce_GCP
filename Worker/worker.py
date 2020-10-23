@@ -10,9 +10,6 @@ import logging
 
 class Worker:
 
-    def __init__(self):
-        self.status == 'IDLE'
-
     def map_wordcount(self, filename, index):
         print('Inside mapper wordcount')
         try:
@@ -175,7 +172,9 @@ class Worker:
             return 'error_fetch'
                 
     def getStatus(self, key_store_ip):
+        logging.info('key store ip ' + key_store_ip)
         self.key_store = xmlrpc.client.ServerProxy("http://{0}:{1}".format(key_store_ip, str(3389)))
+        logging.info('key_store ' + str(self.key_store))
         if self.key_store.getStatus() == 'OK':
             return 'OK'
         else:
