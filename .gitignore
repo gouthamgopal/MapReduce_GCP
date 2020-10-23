@@ -1,0 +1,5 @@
+*.json
+*.ini
+*.pyc
+Output/
+*.log
