@@ -94,7 +94,8 @@ class MasterServer:
                 logging.exception("Could not connect to key value store, trying again!")
                 time.sleep(10)
                 continue
-
+        
+        config["kv_client"] = {}
         config["kv_client"]["rpc_client"] = kv_client
         config["kv_client"]["ip"] = external_ip
 
@@ -117,6 +118,7 @@ class MasterServer:
                     time.sleep(10)
                     continue
             
+            config["worker_client"] = {}
             config["worker_client"][str(i)] = worker_client
         
         return time.time()

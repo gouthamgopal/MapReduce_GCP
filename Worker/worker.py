@@ -173,7 +173,10 @@ class Worker:
                 
     def getStatus(self, key_store_ip):
         self.key_store = xmlrpc.client.ServerProxy("http://{0}:{1}".format(key_store_ip, str(3389)))
-        return 'OK'
+        if self.key_store.getStatus() == 'OK':
+            return 'OK'
+        else:
+            return 'Error'
 
 
 def main():
