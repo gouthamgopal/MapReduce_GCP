@@ -103,6 +103,7 @@ class MasterServer:
                 print("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 if kv_client.getStatus() == 'OK':
+                    logging.info('Key store status OK.')
                     break
             except:
                 logging.exception("Could not connect to key value store, trying again!")

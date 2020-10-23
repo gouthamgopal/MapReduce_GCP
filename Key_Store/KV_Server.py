@@ -86,6 +86,7 @@ def mapReduceHandler(data):
             return (res)
 
 def getStatus():
+    logging.info('Checked status of keystore.')
     return 'OK'
 
 def flushFiles():
