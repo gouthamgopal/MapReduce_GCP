@@ -10,9 +10,6 @@ import logging
 
 class Worker:
 
-    def __init__(self):
-        self.status == 'IDLE'
-
     def map_wordcount(self, filename, index):
         print('Inside mapper wordcount')
         try:
