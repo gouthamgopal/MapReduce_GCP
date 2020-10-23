@@ -99,7 +99,7 @@ def main():
         print('Starting a KV Server')
         logging.info('Key store server started. Awaiting connection.')
         
-        server = SimpleXMLRPCServer(("localhost", 8001), allow_none=True)
+        server = SimpleXMLRPCServer(("localhost", 3389), allow_none=True)
         server.register_introspection_functions()
         server.register_function(mapReduceHandler, 'mapReduceHandler')
         server.register_function(getStatus, 'getStatus')

@@ -78,18 +78,19 @@ class MasterServer:
         # Check if kv_store server is running.
         try:
             logging.info('Checking for already existing key value store.')
-            _, external_ip = self.gcp_api.getIPAddresses(parser["GCP"]["project_id"], parser["GCP"]["zone"], parser["kv-store"]["name"])
+            _, external_ip = self.gcp_api.getIPAddresses(parser["GCP"]["project"], parser["GCP"]["zone"], parser["kv_store"]["name"])
         except:
             logging.info('Creating a new key value store instance.')
-            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project_id"], parser["GCP"]["zone"], parser["kv-store"]["name"])
-        
-        kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
+            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], parser["kv_store"]["name"])
 
+        print('external ip', external_ip)
         while True:
-            if kv_client.getStatus() == 'OK':
-                break
-            else:
-                logging.info('Waiting for Key value store server to respond.')
+            try:
+                kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
+                if kv_client.getStatus() == 'OK':
+                    break
+            except:
+                logging.exception("Could not connect to key value store, trying again!")
                 time.sleep(5)
                 continue
 
@@ -102,12 +103,14 @@ class MasterServer:
 
             logging.info('Creating worker node instance {0}.'.format(str(i)))
             worker_name = parser["worker"]["name"] + str(i)
-            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project_id"], parser["GCP"]["zone"], worker_name)
-            worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
+            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
             while True:
-                if worker_client.getStatus(config["kv_client"]) == 'OK':
-                    break
-                else:
+                try:
+                    worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
+                
+                    if worker_client.getStatus(config["kv_client"]) == 'OK':
+                        break
+                except:
                     logging.info('Waiting for worker node {0} server to respond.'.format(str(i)))
                     time.sleep(5)
                     continue
