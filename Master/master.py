@@ -41,9 +41,10 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
                 mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
                 print('filename worker: '+file_name)
                 logging.info('filename worker: '+file_name)
-                p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
+                p = Process(target=worker_func, args=(map_func, file_name, index, ))
                 p.start()
                 p.join()
+                # mapper.worker('map', map_func, file_name, index)
 
                 if mapper.checkWorkStatus() == 'DONE':
                     logging.info('Worker {0} returned with status DONE'.format(str(index)))
