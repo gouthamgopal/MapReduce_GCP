@@ -173,6 +173,10 @@ class Worker:
                 
     def getStatus(self, key_store_ip):
         self.key_store = xmlrpc.client.ServerProxy("http://{0}:{1}".format(key_store_ip, str(3389)))
+        if self.key_store.getStatus() == 'OK':
+            return 'OK'
+        else:
+            return 'Error'
 
 
 def main():
@@ -181,7 +185,7 @@ def main():
     logging.info('Starting worker server connection.')
     worker = Worker()
 
-    server = SimpleXMLRPCServer(("localhost", 3389), allow_none=True)
+    server = SimpleXMLRPCServer(("", 3389), allow_none=True)
 
     server.register_instance(worker)
     server.serve_forever()

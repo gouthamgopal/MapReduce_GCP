@@ -86,15 +86,18 @@ class MasterServer:
         print('external ip', external_ip)
         while True:
             try:
+                print("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 if kv_client.getStatus() == 'OK':
                     break
             except:
                 logging.exception("Could not connect to key value store, trying again!")
-                time.sleep(5)
+                time.sleep(10)
                 continue
-
-        config["kv_client"] = kv_client
+        
+        config["kv_client"] = {}
+        config["kv_client"]["rpc_client"] = kv_client
+        config["kv_client"]["ip"] = external_ip
 
         # Create worker nodes based on the number of mapper and reducer instances.
         self.__worker_instance_count = self.__num_mapper if self.__num_mapper > self.__num_reducer else self.__num_reducer
@@ -108,13 +111,14 @@ class MasterServer:
                 try:
                     worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
                 
-                    if worker_client.getStatus(config["kv_client"]) == 'OK':
+                    if worker_client.getStatus(config["kv_client"]["ip"]) == 'OK':
                         break
                 except:
                     logging.info('Waiting for worker node {0} server to respond.'.format(str(i)))
-                    time.sleep(5)
+                    time.sleep(10)
                     continue
             
+            config["worker_client"] = {}
             config["worker_client"][str(i)] = worker_client
         
         return time.time()
@@ -137,7 +141,7 @@ class MasterServer:
         global config
         data_blocks = []
         self.hashLength = self.__num_reducer
-        key_store = config["kv_client"]
+        key_store = config["kv_client"]["rpc_client"]
 
         try:
             # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
@@ -204,7 +208,7 @@ class MasterServer:
     def run_mapred(self, input_path, map_func, red_func, output_path):
         # Call input processing function to split the input according to teh number of workers.
         global config
-        key_store = config["kv_client"]
+        key_store = config["kv_client"]["rpc_client"]
         
         if os.path.isfile(input_path):
             file_list = {}
@@ -331,7 +335,7 @@ class MasterServer:
 
         logging.info('Instructing key store to flush the created files')
         while True:
-            status = config["kv_client"].flushFiles()
+            status = config["kv_client"]["rpc_client"].flushFiles()
             if status == 'OK':
                 break
 
