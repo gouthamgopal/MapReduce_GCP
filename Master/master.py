@@ -38,19 +38,14 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
     for file_name in file_list[str(index)]:
         while True:
             try:
-                if mapper.checkWorkStatus() == 'RUNNING':
-                    time.sleep(2)
-                    continue
-                    
-                elif mapper.checkWorkStatus() == 'IDLE':
-                    mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
-                    print('filename worker: '+file_name)
-                    logging.info('filename worker: '+file_name)
-                    p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
-                    p.start()
-                    p.join()
+                mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+                print('filename worker: '+file_name)
+                logging.info('filename worker: '+file_name)
+                p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
+                p.start()
+                p.join()
 
-                elif mapper.checkWorkStatus() == 'DONE':
+                if mapper.checkWorkStatus() == 'DONE':
                     logging.info('Worker {0} returned with status DONE'.format(str(index)))
                     break
                 
