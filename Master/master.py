@@ -86,6 +86,7 @@ class MasterServer:
         print('external ip', external_ip)
         while True:
             try:
+                print("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
                 if kv_client.getStatus() == 'OK':
                     break
