@@ -92,7 +92,7 @@ class MasterServer:
                     break
             except:
                 logging.exception("Could not connect to key value store, trying again!")
-                time.sleep(5)
+                time.sleep(10)
                 continue
 
         config["kv_client"] = kv_client
@@ -113,7 +113,7 @@ class MasterServer:
                         break
                 except:
                     logging.info('Waiting for worker node {0} server to respond.'.format(str(i)))
-                    time.sleep(5)
+                    time.sleep(10)
                     continue
             
             config["worker_client"][str(i)] = worker_client

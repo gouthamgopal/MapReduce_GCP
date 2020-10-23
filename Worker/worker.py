@@ -181,7 +181,7 @@ def main():
     logging.info('Starting worker server connection.')
     worker = Worker()
 
-    server = SimpleXMLRPCServer(("localhost", 3389), allow_none=True)
+    server = SimpleXMLRPCServer(("", 3389), allow_none=True)
 
     server.register_instance(worker)
     server.serve_forever()
