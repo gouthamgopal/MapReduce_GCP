@@ -35,26 +35,49 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
     print('Inside process creation for mapper method')
     logging.info('Inside process creation for mapper method')
     mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+    print("Inside mapper worker")
+    print(map_func, index, mapper_ip, mapper_port)
+    print(file_list)
     for file_name in file_list[str(index)]:
-        while True:
-            try:
-                mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
-                print('filename worker: '+file_name)
-                logging.info('filename worker: '+file_name)
-                p = Process(target=worker_func, args=(map_func, file_name, index, ))
-                p.start()
-                p.join()
-                # mapper.worker('map', map_func, file_name, index)
+        # while True:
+        #     try:
+        #         status = 'RUNNING'
+        #         mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+        #         print('filename worker: '+file_name)
+        #         logging.info('filename worker: '+file_name)
+        #         p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
+        #         p.start()
+        #         p.join()
+        #         # mapper.worker('map', map_func, file_name, index)
 
-                if mapper.checkWorkStatus() == 'DONE':
-                    logging.info('Worker {0} returned with status DONE'.format(str(index)))
+        #         while True:
+        #             if mapper.checkWorkStatus() == 'DONE':
+        #                 status = 'DONE'
+        #                 logging.info('Worker {0} returned with status DONE'.format(str(index)))
+        #                 break
+        #             else:
+        #                 time.sleep(5)
+
+        #         if status == 'DONE':
+        #             break
+
+        #     except Exception as e:
+        #         logging.exception(str(e))
+        #         logging.info('Restarting the mapper process.')
+        #         # mapper.setWorkStatus('IDLE')
+        #         continue
+        try:
+            mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+            mapper.worker('map', map_func, file_name, index)
+
+            while True:
+                print("waiting for mapper")
+                if mapper.checkWorkStatus() == "DONE":
                     break
-                
-            except:
-                logging.info('Restarting the mapper process.')
-                mapper.setWorkStatus('IDLE')
-                continue
 
+        except Exception as e:
+            logging.exception(str(e))
+            
 def reducerWorker(red_func, index, file_list, reducer_ip, reducer_port):
     print('Inside proces creation for reducer method')
     logging.info('Inside proces creation for reducer method')

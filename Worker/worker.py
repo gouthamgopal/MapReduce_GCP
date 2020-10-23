@@ -12,12 +12,14 @@ class Worker:
 
     def map_wordcount(self, filename, index):
         print('Inside mapper wordcount')
+        logging.info('Inside mapper wordcount')
         try:
             output = []
             key = filename.split('.')[0]
             key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
             get_str = 'get ' + filename + ' ' + key
             print('mapper query string: '+ get_str)
+            logging.info('Mapper query string ' + get_str)
 
             try:
                 raw_data = key_store.mapReduceHandler(get_str)
@@ -39,23 +41,23 @@ class Worker:
                 data[key] = output
 
                 # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                send_str = 'set {0} {1} {2} \n{3}\n'.format(
-                    json_file, key, len(data), json.dumps(data))
-                
-                try:
-                    res = key_store.mapReduceHandler(send_str)
-                except:
-                    logging.error("Error in file put to key store in map wordcount.")
-                    raise 'Error in file put to key store in map wordcount.'
+            send_str = 'set {0} {1} {2} \n{3}\n'.format(
+                json_file, key, len(data), json.dumps(data))
+            
+            try:
+                res = key_store.mapReduceHandler(send_str)
+            except:
+                logging.error("Error in file put to key store in map wordcount.")
+                raise 'Error in file put to key store in map wordcount.'
 
-                if res.split(' ')[0] == 'STORED':
-                    return json_file
-                else:
-                    logging.warning('Error response generated while key store dump in wordcount mapper.')
-                    return 'error_response'
-
-                logging.warning('Error response generated while conecting to key store in wordcount mapper.')
+            if res.split(' ')[0] == 'STORED':
+                return json_file
+            else:
+                logging.warning('Error response generated while key store dump in wordcount mapper.')
                 return 'error_response'
+
+            logging.warning('Error response generated while conecting to key store in wordcount mapper.')
+            return 'error_response'
 
         except Exception as e:
             print(str(e))
@@ -230,16 +232,24 @@ class Worker:
             if mode == 'map':
                 if func == 'wordcount':
                     logging.info('Calling wordcount map function')
-                    self.map_wordcount(filename, index)
+                    result = self.map_wordcount(filename, index)
+                    if result != 'error_response':
+                        self.status = 'DONE'
+                        return result
                 elif func == 'invertedindex':
                     logging.info('Calling inverted index map function')
-                    self.map_invertedindex(filename, index)
+                    result = self.map_invertedindex(filename, index)
+                    if result != 'error_response':
+                        self.status = 'DONE'
+                        return result
             
             if mode == 'reduce':
                 logging.info('Calling reducer helper function')
-                self.reducer_helper(filename, func, index)
+                self.status = 'DONE'
+                return(self.reducer_helper(filename, func, index))
 
             self.status = 'DONE'
+            
         except Exception as e:
             raise e
     
