@@ -1,6 +1,4 @@
 #!/bin/bash
-sudo apt-get update
-
 cd /home/ggopal
 echo 'In home/gopal' > log.txt
 git clone -b key_store https://github.com/gouthamgopal/MapReduce_GCP.git

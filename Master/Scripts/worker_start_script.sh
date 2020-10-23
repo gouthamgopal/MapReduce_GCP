@@ -1,6 +1,4 @@
 #!/bin/bash
-sudo apt-get update
-
 cd /home/ggopal
 git clone -b worker https://github.com/gouthamgopal/MapReduce_GCP.git
 cd MapReduce_GCP

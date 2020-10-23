@@ -22,7 +22,7 @@ def getDataFromMapReduceFile(data):
     key = raw_data[2]
 
     try:
-        with open('Key_store/'+filename, 'r') as infile:
+        with open(filename, 'r') as infile:
             ret_data = json.load(infile)
 
             print(len(ret_data[key]))
@@ -48,7 +48,7 @@ def setDataToMapReduceFile(value):
     print(filename, key)
 
     try:
-        with open('Key_Store/' + filename, 'w+') as file:
+        with open(filename, 'w+') as file:
             json.dump(payload, file)
             logging.info('Success in dump data at keystore.')
             return True
