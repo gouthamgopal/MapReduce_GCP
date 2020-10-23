@@ -10,6 +10,9 @@ import logging
 
 class Worker:
 
+    def __init__(self):
+        self.status == 'IDLE'
+
     def map_wordcount(self, filename, index):
         print('Inside mapper wordcount')
         try:
@@ -177,6 +180,26 @@ class Worker:
             return 'OK'
         else:
             return 'Error'
+
+    def worker(self, mode, func, filename, index):
+        self.status = 'RUNNING'
+        if mode == 'map':
+            if func == 'wordcount':
+                self.map_wordcount(filename, index)
+            elif func == 'invertedindex':
+                self.map_invertedindex(filename, index)
+        
+        if mode == 'reduce':
+            self.reducer_helper(filename, func, index)
+
+        self.status = 'DONE'
+        return
+    
+    def getWorkStatus(self):
+        return self.status
+
+    def setStatus(self, status):
+        self.status = status
 
 
 def main():

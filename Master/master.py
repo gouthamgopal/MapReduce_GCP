@@ -17,46 +17,60 @@ from xmlrpc.server import SimpleXMLRPCServer
 
 config = {}
 
-def worker_func( map_func, filename, index):
-    global config
+def worker_func(map_func, filename, index, mapper_ip, mapper_port):
+    # global config
+    # print(config)
     print('Inside worker function calling method')
     logging.info('Inside worker function calling method')
-    mapper = config["worker_client"][str(index)]
+    # mapper = config["worker_client"][str(index)]
     if map_func == 'wordcount':
-        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-        mapper.map_wordcount(filename, index)
+        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port))) as mapper:
+            mapper.map_wordcount(filename, index)
     elif map_func == 'invertedindex':
-        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-        mapper.map_invertedindex(filename, index)
+        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port))) as mapper:
+            mapper.map_invertedindex(filename, index)
         return
 
-def mapperWorker(map_func, index, file_list):
+def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
     print('Inside process creation for mapper method')
     logging.info('Inside process creation for mapper method')
-    # mapper = 
-    tasks = []
+    mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
     for file_name in file_list[str(index)]:
-        print('filename worker'+file_name)
-        logging.info('filename worker: '+file_name)
-        p = Process(target=worker_func, args=(map_func, file_name, index, ))
-        p.start()
-        tasks.append(p)
-    for task in tasks:
-        task.join()
-    return
+        while True:
+            try:
+                if mapper.getWorkStatus() == 'RUNNING':
+                    time.sleep(2)
+                    continue
+                    
+                elif mapper.getWorkStatus() == 'IDLE':
+                    mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+                    print('filename worker: '+file_name)
+                    logging.info('filename worker: '+file_name)
+                    p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
+                    p.start()
+                    p.join()
 
-def reducerWorker(red_func, index, file_list):
+                elif mapper.getWorkStatus() == 'DONE':
+                    logging.info('Worker {0} returned with status DONE'.format(str(index)))
+                    break
+                
+            except:
+                logging.info('Restarting the mapper process.')
+                mapper.setStatus('IDLE')
+                continue
+
+def reducerWorker(red_func, index, file_list, reducer_ip, reducer_port):
     print('Inside proces creation for reducer method')
     logging.info('Inside proces creation for reducer method')
-    reducer = config["worker_client"][str(index)]
+    # reducer = config["worker_client"][str(index)]
     if red_func == 'wordcount':
         print('reducer_file_name: '+ file_list[index])
-        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-        reducer.reducer_helper(file_list[index], red_func, index)
+        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
+            reducer.reducer_helper(red_func, file_list[index], index)
     elif red_func == 'invertedindex':
         print('reducer_file_name: '+ file_list[index])
-        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-        reducer.reducer_helper(file_list[index], red_func, index)
+        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
+            reducer.reducer_helper(file_list[index], red_func, index)
         
 
 class MasterServer:
@@ -102,6 +116,8 @@ class MasterServer:
         # Create worker nodes based on the number of mapper and reducer instances.
         self.__worker_instance_count = self.__num_mapper if self.__num_mapper > self.__num_reducer else self.__num_reducer
 
+        config["worker_client"] = {}
+
         for i in range(self.__worker_instance_count):
 
             logging.info('Creating worker node instance {0}.'.format(str(i)))
@@ -118,9 +134,9 @@ class MasterServer:
                     time.sleep(10)
                     continue
             
-            config["worker_client"] = {}
-            config["worker_client"][str(i)] = worker_client
+            config["worker_client"][str(i)] = external_ip
         
+        print(config)
         return time.time()
         
     def genHash(self, word):
@@ -136,6 +152,49 @@ class MasterServer:
                 final_map[word_tuple[0]] = [word_tuple[1]]
         # print(final_map)
         return final_map
+    
+    # def worker_func(self, map_func, filename, index):
+    #     global config
+    #     print(config)
+    #     print('Inside worker function calling method')
+    #     logging.info('Inside worker function calling method')
+    #     mapper = config["worker_client"][str(index)]
+    #     if map_func == 'wordcount':
+    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
+    #         mapper.map_wordcount(filename, index)
+    #     elif map_func == 'invertedindex':
+    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
+    #         mapper.map_invertedindex(filename, index)
+    #         return
+
+    # def mapperWorker(self, map_func, index, file_list):
+    #     print('Inside process creation for mapper method')
+    #     logging.info('Inside process creation for mapper method')
+    #     # mapper = 
+    #     tasks = []
+    #     for file_name in file_list[str(index)]:
+    #         print('filename worker: '+file_name)
+    #         logging.info('filename worker: '+file_name)
+    #         p = Process(target=worker_func, args=(map_func, file_name, index, ))
+    #         p.start()
+    #         tasks.append(p)
+    #     for task in tasks:
+    #         task.join()
+    #     return
+
+    # def reducerWorker(self, red_func, index, file_list):
+    #     global config
+    #     print('Inside proces creation for reducer method')
+    #     logging.info('Inside proces creation for reducer method')
+    #     reducer = config["worker_client"][str(index)]
+    #     if red_func == 'wordcount':
+    #         print('reducer_file_name: '+ file_list[index])
+    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
+    #         reducer.reducer_helper(file_list[index], red_func, index)
+    #     elif red_func == 'invertedindex':
+    #         print('reducer_file_name: '+ file_list[index])
+    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
+    #         reducer.reducer_helper(file_list[index], red_func, index)
     
     def __combine_mapper(self):
         global config
@@ -265,10 +324,10 @@ class MasterServer:
                 print(res)
                 logging.info('Initial data storage result: ' + res)
 
-        self.__worker_list = []
-        obj = xmlrpc.client.ServerProxy("http://localhost:8000/", allow_none=True)
-        for i in range(self.__num_mapper):
-            self.__worker_list.append(obj)
+        # self.__worker_list = []
+        # obj = xmlrpc.client.ServerProxy("http://localhost:8000/", allow_none=True)
+        # for i in range(self.__num_mapper):
+        #     self.__worker_list.append(obj)
 
         self.file_list = file_list
 
@@ -277,7 +336,9 @@ class MasterServer:
             print(file_list[file])
 
         for idx in range(self.__num_mapper):
-            p = Process(target=mapperWorker, args=(map_func, idx, self.file_list))
+            mapper_ip = config["worker_client"][str(idx)]
+            mapper_port = 3389
+            p = Process(target=mapperWorker, args=(map_func, idx, self.file_list, mapper_ip, mapper_port, ))
             p.start()
             tasks.append(p)
 
@@ -297,9 +358,11 @@ class MasterServer:
         print(self.__combiner_files)
         tasks = []
         for i in range(self.__num_reducer):
+            reducer_ip = config["worker_client"][str(i)]
+            reducer_port = 3389
             print('Inside reducer call process generation')
             logging.info('Inside reducer call process generation')
-            p = Process(target=reducerWorker, args=(red_func, i, self.__combiner_files, ))
+            p = Process(target=reducerWorker, args=(red_func, i, self.__combiner_files, reducer_ip, reducer_port, ))
             p.start()
             tasks.append(p)
         for task in tasks:
