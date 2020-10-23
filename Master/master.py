@@ -38,11 +38,11 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
     for file_name in file_list[str(index)]:
         while True:
             try:
-                if mapper.getWorkStatus() == 'RUNNING':
+                if mapper.checkWorkStatus() == 'RUNNING':
                     time.sleep(2)
                     continue
                     
-                elif mapper.getWorkStatus() == 'IDLE':
+                elif mapper.checkWorkStatus() == 'IDLE':
                     mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
                     print('filename worker: '+file_name)
                     logging.info('filename worker: '+file_name)
@@ -50,13 +50,13 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
                     p.start()
                     p.join()
 
-                elif mapper.getWorkStatus() == 'DONE':
+                elif mapper.checkWorkStatus() == 'DONE':
                     logging.info('Worker {0} returned with status DONE'.format(str(index)))
                     break
                 
             except:
                 logging.info('Restarting the mapper process.')
-                mapper.setStatus('IDLE')
+                mapper.setWorkStatus('IDLE')
                 continue
 
 def reducerWorker(red_func, index, file_list, reducer_ip, reducer_port):
@@ -125,13 +125,14 @@ class MasterServer:
             worker_name = parser["worker"]["name"] + str(i)
             _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
             print('external', external_ip)
+            # time.sleep(5)
             while True:
                 try:
                     print('before worker client')
                     worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
                     print('worker client', worker_client)
                     print(config['kv_client']['ip'])
-                    print(worker_client.getStatus(config["kv_client"]["ip"]))
+                    
                     if worker_client.getStatus(config["kv_client"]["ip"]) == 'OK':
                         break
                 except Exception as e:
