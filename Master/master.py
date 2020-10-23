@@ -9,20 +9,26 @@ import glob
 import json
 import pickle
 import logging
+import gcp
+import time
 from configparser import ConfigParser
 
 from xmlrpc.server import SimpleXMLRPCServer
 
+config = {}
+
 def worker_func( map_func, filename, index):
+    global config
     print('Inside worker function calling method')
     logging.info('Inside worker function calling method')
+    mapper = config["worker_client"][str(index)]
     if map_func == 'wordcount':
-        with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-            mapper.map_wordcount(filename, index)
+        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
+        mapper.map_wordcount(filename, index)
     elif map_func == 'invertedindex':
-        with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-            mapper.map_invertedindex(filename, index)
-            return
+        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
+        mapper.map_invertedindex(filename, index)
+        return
 
 def mapperWorker(map_func, index, file_list):
     print('Inside process creation for mapper method')
@@ -42,15 +48,15 @@ def mapperWorker(map_func, index, file_list):
 def reducerWorker(red_func, index, file_list):
     print('Inside proces creation for reducer method')
     logging.info('Inside proces creation for reducer method')
-
+    reducer = config["worker_client"][str(index)]
     if red_func == 'wordcount':
         print('reducer_file_name: '+ file_list[index])
-        with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-            reducer.reducer_helper(file_list[index], red_func, index)
+        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
+        reducer.reducer_helper(file_list[index], red_func, index)
     elif red_func == 'invertedindex':
         print('reducer_file_name: '+ file_list[index])
-        with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-            reducer.reducer_helper(file_list[index], red_func, index)
+        # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
+        reducer.reducer_helper(file_list[index], red_func, index)
         
 
 class MasterServer:
@@ -59,14 +65,60 @@ class MasterServer:
         self.__mapper_files = []
         self.__combiner_files = []
         self.__reducer_files = []
+        self.gcp_api = gcp.GCP_API()
 
     def init_cluster(self, num_mapper, num_reducer):
         # Check and run the key value store if not already running.
         # Create number of workers based on the requirement, store the value in self.__worker_list, The list would contain the xmlrpc client of each worker node, connected through ip
         # after creating the instance.
+        global config
         self.__num_mapper = num_mapper
         self.__num_reducer = num_reducer
 
+        # Check if kv_store server is running.
+        try:
+            logging.info('Checking for already existing key value store.')
+            _, external_ip = self.gcp_api.getIPAddresses(parser["GCP"]["project"], parser["GCP"]["zone"], parser["kv_store"]["name"])
+        except:
+            logging.info('Creating a new key value store instance.')
+            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], parser["kv_store"]["name"])
+
+        print('external ip', external_ip)
+        while True:
+            try:
+                kv_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["kv_store"]["port"]))
+                if kv_client.getStatus() == 'OK':
+                    break
+            except:
+                logging.exception("Could not connect to key value store, trying again!")
+                time.sleep(5)
+                continue
+
+        config["kv_client"] = kv_client
+
+        # Create worker nodes based on the number of mapper and reducer instances.
+        self.__worker_instance_count = self.__num_mapper if self.__num_mapper > self.__num_reducer else self.__num_reducer
+
+        for i in range(self.__worker_instance_count):
+
+            logging.info('Creating worker node instance {0}.'.format(str(i)))
+            worker_name = parser["worker"]["name"] + str(i)
+            _, external_ip = self.gcp_api.create_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
+            while True:
+                try:
+                    worker_client = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(external_ip, parser["worker"]["port"]))
+                
+                    if worker_client.getStatus(config["kv_client"]) == 'OK':
+                        break
+                except:
+                    logging.info('Waiting for worker node {0} server to respond.'.format(str(i)))
+                    time.sleep(5)
+                    continue
+            
+            config["worker_client"][str(i)] = worker_client
+        
+        return time.time()
+        
     def genHash(self, word):
         hash_val = hash(word)
         return hash_val%self.hashLength
@@ -82,23 +134,25 @@ class MasterServer:
         return final_map
     
     def __combine_mapper(self):
+        global config
         data_blocks = []
         self.hashLength = self.__num_reducer
+        key_store = config["kv_client"]
 
         try:
-            with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                for map_file in self.__mapper_files:
-                    map_key = map_file.split('.')[0]
-                    
-                    get_str = 'get ' + map_file + ' ' + map_key
-                    raw_data = key_store.mapReduceHandler(get_str)
-                    raw_data = raw_data.split('\n')[0]
-                    if raw_data != 'error_get':
-                        data = json.loads(raw_data)
-            
-                        [data_blocks.append(val) for val in data[map_key]]
-                    else:
-                        logging.warning('Error data fetch in combiner')
+            # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+            for map_file in self.__mapper_files:
+                map_key = map_file.split('.')[0]
+                
+                get_str = 'get ' + map_file + ' ' + map_key
+                raw_data = key_store.mapReduceHandler(get_str)
+                raw_data = raw_data.split('\n')[0]
+                if raw_data != 'error_get':
+                    data = json.loads(raw_data)
+        
+                    [data_blocks.append(val) for val in data[map_key]]
+                else:
+                    logging.warning('Error data fetch in combiner')
         except Exception as e:
             logging.exception('Exception raised connecting to key store in combiner' + str(e))
 
@@ -116,19 +170,19 @@ class MasterServer:
         logging.info('Done hashing files in combiner')
         
         try:
-            with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                for keys in grouped_words:
-                    json_file = 'intermediate_{0}.json'.format(keys)
-                    self.__combiner_files.append(json_file)
-                    key = 'intermediate_{0}'.format(keys)
-                    data = {}
-                    # grouped_words[keys].sort()
-                    final_map = self.flatMapWords(grouped_words[keys])
-                    data[key] = final_map
-                    send_str = 'set {0} {1} {2} \n{3}\n'.format(json_file, key, len(data), json.dumps(data))
-                    res = key_store.mapReduceHandler(send_str)
-                    print(res)
-                    logging.info('Combiner result: '+ res)
+            # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+            for keys in grouped_words:
+                json_file = 'intermediate_{0}.json'.format(keys)
+                self.__combiner_files.append(json_file)
+                key = 'intermediate_{0}'.format(keys)
+                data = {}
+                # grouped_words[keys].sort()
+                final_map = self.flatMapWords(grouped_words[keys])
+                data[key] = final_map
+                send_str = 'set {0} {1} {2} \n{3}\n'.format(json_file, key, len(data), json.dumps(data))
+                res = key_store.mapReduceHandler(send_str)
+                print(res)
+                logging.info('Combiner result: '+ res)
         except Exception as e:
             logging.exception('Exception raised connecting to key store in combiner' + str(e))
     
@@ -149,6 +203,8 @@ class MasterServer:
 
     def run_mapred(self, input_path, map_func, red_func, output_path):
         # Call input processing function to split the input according to teh number of workers.
+        global config
+        key_store = config["kv_client"]
         
         if os.path.isfile(input_path):
             file_list = {}
@@ -165,14 +221,14 @@ class MasterServer:
                     map_data = formatted_string[i*self.__chunk_length:]
 
                 # Store the result in the key value store for mapper to consume and append it to the mapper files list. use filename as key.
-                with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                    key = filename.split('.')[0]
-                    payload = {}
-                    payload[key] = map_data
-                    send_str = 'set {0} {1} {2} \n{3}\n'.format(filename, key, len(map_data), json.dumps(payload))
-                    res = key_store.mapReduceHandler(send_str)
-                    print(res)
-                    logging.info('Initial data storage result: ' + res)
+                # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+                key = filename.split('.')[0]
+                payload = {}
+                payload[key] = map_data
+                send_str = 'set {0} {1} {2} \n{3}\n'.format(filename, key, len(map_data), json.dumps(payload))
+                res = key_store.mapReduceHandler(send_str)
+                print(res)
+                logging.info('Initial data storage result: ' + res)
 
             #TODO: initialize worker list in init_cluster with the connection to each worker VM instance created.
 
@@ -196,14 +252,14 @@ class MasterServer:
                 else:
                     file_list[str(hash_val)] = [file_name]
 
-                with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                    key = file_name.split('.')[0]
-                    payload = {}
-                    payload[key] = formatted_string
-                    send_str = 'set {0} {1} {2} \n{3}\n'.format(file_name, key, len(formatted_string), json.dumps(payload))
-                    res = key_store.mapReduceHandler(send_str)
-                    print(res)
-                    logging.info('Initial data storage result: ' + res)
+                # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+                key = file_name.split('.')[0]
+                payload = {}
+                payload[key] = formatted_string
+                send_str = 'set {0} {1} {2} \n{3}\n'.format(file_name, key, len(formatted_string), json.dumps(payload))
+                res = key_store.mapReduceHandler(send_str)
+                print(res)
+                logging.info('Initial data storage result: ' + res)
 
         self.__worker_list = []
         obj = xmlrpc.client.ServerProxy("http://localhost:8000/", allow_none=True)
@@ -253,16 +309,16 @@ class MasterServer:
 
         result = {}
 
-        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(parser['kvstore']['ip'], int(parser['kstoore']['port']))) as key_store:
-            for file in self.__reducer_files:
-                key = file.split('.')[0]
-                get_str = 'get ' + file + ' ' + key
-                raw_data = key_store.mapReduceHandler(get_str)
-                raw_data = raw_data.split('\n')[0]
+        # with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(parser['kvstore']['ip'], int(parser['kstoore']['port']))) as key_store:
+        for file in self.__reducer_files:
+            key = file.split('.')[0]
+            get_str = 'get ' + file + ' ' + key
+            raw_data = key_store.mapReduceHandler(get_str)
+            raw_data = raw_data.split('\n')[0]
 
-                json_data = json.loads(raw_data)
-                # [result.append(val) for val in json_data[key]]
-                result[key] = json_data[key]
+            json_data = json.loads(raw_data)
+            # [result.append(val) for val in json_data[key]]
+            result[key] = json_data[key]
 
         final = json.dumps(result, sort_keys=True, indent=2, separators=(',', ':')) 
         with open(output_path, 'w+') as f:
@@ -271,17 +327,26 @@ class MasterServer:
         logging.info('Completed map reduce function for ' + map_func)
 
     def destroy_cluster(self, ):
-        pass
+        global config
+
+        logging.info('Instructing key store to flush the created files')
+        while True:
+            status = config["kv_client"].flushFiles()
+            if status == 'OK':
+                break
+
+        logging.info('Destroying created worker nodes from the cluster')
+        for i in self.__worker_instance_count:
+            worker_name = parser["worker"]["name"]+str(i)
+            self.gcp_api.delete_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
 
 if __name__ == "__main__":
     parser = ConfigParser()
     parser.read('config.ini')
-
+  
     logging.basicConfig(filename='master.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
     master = MasterServer()
-    # master.init_cluster(3, 4)
-    # master.run_mapred(r"D:\IUB\IU_Fall_20\Cloud_Computing\Map_reduce\Master\inverted_index\Galatea.txt", 'wordcount', 'wordcount', 'Output/wordcount_output.txt')
-    # master.run_mapred(r"D:\IUB\IU_Fall_20\Cloud_Computing\Map_reduce\Master\inverted_index", 'invertedindex', 'invertedindex', 'Output/invertedIndex_output.txt')
+    
     try:
         print('Starting master node RPC server')
         logging.info('Starting master node RPC server')

@@ -3,8 +3,10 @@ import socket
 import json
 import logging
 import sys
+import glob
+import os
 
-sys.path.append('Key_Store')
+# sys.path.append('Key_Store')
   
 # import thread module 
 import threading 
@@ -83,13 +85,25 @@ def mapReduceHandler(data):
         if res != None:
             return (res)
 
+def getStatus():
+    return 'OK'
+
+def flushFiles():
+    files = glob.glob('*.json')
+    for f in files:
+        os.remove(f)
+    return 'OK'
+
 def main():
     try:
         print('Starting a KV Server')
         logging.info('Key store server started. Awaiting connection.')
         
-        server = SimpleXMLRPCServer(("localhost", 8001), allow_none=True)
-        server.register_function(mapReduceHandler)
+        server = SimpleXMLRPCServer(("localhost", 3389), allow_none=True)
+        server.register_introspection_functions()
+        server.register_function(mapReduceHandler, 'mapReduceHandler')
+        server.register_function(getStatus, 'getStatus')
+        server.register_function(flushFiles, 'flushFiles')
 
         print('Waiting for connection...')
         server.serve_forever()
