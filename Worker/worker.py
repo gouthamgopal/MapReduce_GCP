@@ -12,13 +12,21 @@ class Worker:
 
     def map_wordcount(self, filename, index):
         print('Inside mapper wordcount')
+        logging.info('Inside mapper wordcount')
         try:
             output = []
             key = filename.split('.')[0]
-            # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+            key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
             get_str = 'get ' + filename + ' ' + key
             print('mapper query string: '+ get_str)
-            raw_data = self.key_store.mapReduceHandler(get_str)
+            logging.info('Mapper query string ' + get_str)
+
+            try:
+                raw_data = key_store.mapReduceHandler(get_str)
+            except:
+                logging.error("Error in file get from key store in map wordcount.")
+                raise 'Error in file get from key store in map wordcount.'
+
             raw_data = raw_data.split('\n')[0]
             json_data = json.loads(raw_data)
 
@@ -33,27 +41,34 @@ class Worker:
                 data[key] = output
 
                 # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
-                send_str = 'set {0} {1} {2} \n{3}\n'.format(
-                    json_file, key, len(data), json.dumps(data))
-                res = self.key_store.mapReduceHandler(send_str)
-                if res.split(' ')[0] == 'STORED':
-                    return json_file
-                else:
-                    logging.warning('Error response generated while key store dump in wordcount mapper.')
-                    return 'error_response'
+            send_str = 'set {0} {1} {2} \n{3}\n'.format(
+                json_file, key, len(data), json.dumps(data))
+            
+            try:
+                res = key_store.mapReduceHandler(send_str)
+            except:
+                logging.error("Error in file put to key store in map wordcount.")
+                raise 'Error in file put to key store in map wordcount.'
 
-                logging.warning('Error response generated while conecting to key store in wordcount mapper.')
+            if res.split(' ')[0] == 'STORED':
+                return json_file
+            else:
+                logging.warning('Error response generated while key store dump in wordcount mapper.')
                 return 'error_response'
+
+            logging.warning('Error response generated while conecting to key store in wordcount mapper.')
+            return 'error_response'
 
         except Exception as e:
             print(str(e))
             logging.exception('Exception raised in wordcount mapper: '+ str(e))
             logging.info('Returning from wordcount mapper since error in connection with key store server.')
-            return 'error in connection.'
+            raise e
 
     def map_invertedindex(self, filename, index):
         # for file_name in filename:
         print('{0} filename is getting mapped'.format(filename))
+        key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
         try:
             output = []
 
@@ -64,7 +79,11 @@ class Worker:
             # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
             get_str = 'get ' + filename + ' ' + key
             print('mapper query string: '+ get_str)
-            raw_data = self.key_store.mapReduceHandler(get_str)
+            try:
+                raw_data = key_store.mapReduceHandler(get_str)
+            except:
+                logging.error("Error in file get from key store in map inverted index.")
+                raise 'Error in file get from key store in map inverted index.'
             # print('rwa data:', raw_data)
             raw_data = raw_data.split('\n')[0]
             # print('raw data formatted:', raw_data)
@@ -89,7 +108,12 @@ class Worker:
             # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
             send_str = 'set {0} {1} {2} \n{3}\n'.format(
                 json_file, key, len(data), json.dumps(data))
-            res = self.key_store.mapReduceHandler(send_str)
+            try:
+                res = key_store.mapReduceHandler(send_str)
+            except:
+                logging.error("Error in file put to key store in map inverted index.")
+                raise 'Error in file put to key store in map inverted index.'
+
             if res.split(' ')[0] == 'STORED':
                 return json_file
             else:
@@ -103,11 +127,13 @@ class Worker:
             print(str(e))
             logging.exception('Exception raised in inverted index mapper: '+ str(e))
             logging.info('Returning from inverted index mapper since error in connection with key store server.')
-            return 'error in connection.'
+            raise e
 
     def reducer_wordcount(self, data, key, index):
         reduced_count = []
         word_res = data[key]
+
+        key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
 
         for key in word_res:
             reduced_count.append([key, sum(word_res[key])])
@@ -120,12 +146,18 @@ class Worker:
         # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
         send_str = 'set {0} {1} {2} \n{3}\n'.format(
             json_file, json_key, len(final), json.dumps(final))
-        res = self.key_store.mapReduceHandler(send_str)
+        try:
+            res = key_store.mapReduceHandler(send_str)
+        except:
+            logging.error("Error in file get from key store in reducer word count.")
+            raise 'Error in file get from key store in reducer word count.'
         print(res)
 
     def reducer_invertedindex(self, data, key, index):
         reduced_words = {}
         word_res = data[key]
+
+        key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
 
         # for keys in word_res:
         for key in word_res:
@@ -149,17 +181,29 @@ class Worker:
         # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
         send_str = 'set {0} {1} {2} \n{3}\n'.format(
             json_file, json_key, len(final), json.dumps(final))
-        res = self.key_store.mapReduceHandler(send_str)
+        
+        try:
+            res = key_store.mapReduceHandler(send_str)
+        except:
+            logging.error("Error in file put to key store in reduce inverted index.")
+            raise 'Error in file put to key store in reduce inverted index.'
+
         return res
 
     def reducer_helper(self, filename, red_func, index):
 
         # with xmlrpc.client.ServerProxy("http://localhost:8001/") as key_store:
+        key_store = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(self.key_store_ip, str(3389)))
         intermediate_key = filename.split('.')[0]
         get_str = 'get ' + filename + ' ' + intermediate_key
         print(get_str)
         logging.info('Reducer get string: ' + get_str)
-        raw_data = self.key_store.mapReduceHandler(get_str)
+        try:
+            raw_data = key_store.mapReduceHandler(get_str)
+        except:
+            logging.error('Error in file get in reducer helper.')
+            raise 'Error in file get in reducer helper.'
+
         raw_data = raw_data.split('\n')[0]
         if raw_data != 'error_get':
             data = json.loads(raw_data)
@@ -173,6 +217,7 @@ class Worker:
                 
     def getStatus(self, key_store_ip):
         logging.info('key store ip ' + key_store_ip)
+        self.key_store_ip = key_store_ip
         self.key_store = xmlrpc.client.ServerProxy("http://{0}:{1}".format(key_store_ip, str(3389)))
         logging.info('key_store ' + str(self.key_store))
         if self.key_store.getStatus() == 'OK':
@@ -181,21 +226,35 @@ class Worker:
             return 'Error'
 
     def worker(self, mode, func, filename, index):
-        self.status = 'RUNNING'
-        if mode == 'map':
-            if func == 'wordcount':
-                self.map_wordcount(filename, index)
-            elif func == 'invertedindex':
-                self.map_invertedindex(filename, index)
-        
-        if mode == 'reduce':
-            self.reducer_helper(filename, func, index)
+        try:
+            self.status = 'RUNNING'
+            logging.info('Set Status to running.')
+            if mode == 'map':
+                if func == 'wordcount':
+                    logging.info('Calling wordcount map function')
+                    result = self.map_wordcount(filename, index)
+                    if result != 'error_response':
+                        self.status = 'DONE'
+                        return result
+                elif func == 'invertedindex':
+                    logging.info('Calling inverted index map function')
+                    result = self.map_invertedindex(filename, index)
+                    if result != 'error_response':
+                        self.status = 'DONE'
+                        return result
+            
+            if mode == 'reduce':
+                logging.info('Calling reducer helper function')
+                self.status = 'DONE'
+                return(self.reducer_helper(filename, func, index))
 
-        self.status = 'DONE'
-        return
+            self.status = 'DONE'
+            
+        except Exception as e:
+            raise e
     
     def checkWorkStatus(self):
-        return self.status
+        return self.status if self.status != None else 'IDLE'
 
     def setWorkStatus(self, status):
         self.status = status

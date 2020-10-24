@@ -58,6 +58,22 @@ def setDataToMapReduceFile(value):
     logging.error('Error fetching data in keystore.')
     return False
 
+def setDataToFile(data):
+    jsonData = data.split('\n')[1]
+    raw_data = data.split('\n')[0].split(' ')
+
+    filename = raw_data[1]
+    try:
+        with open(filename, 'w+') as f:
+            f.write(jsonData)
+            logging.info('Success in dump output data at keystore.')
+            return True
+    except Exception as e:
+        logging.exception('Exception raised for dumping data in key value store ' + str(e))
+
+    logging.error('Error fetching data in keystore.')
+    return False
+
 def mapReduceHandler(data):
     print('Inside map reduce handler')
     logging.info('Inside map reduce handler function in Keystore.')
@@ -84,6 +100,16 @@ def mapReduceHandler(data):
 
         if res != None:
             return (res)
+    
+    if selection == 'setOp':
+
+        safe_lock.acquire()
+        res = setDataToFile(data)
+        safe_lock.release()
+
+        print(len(res))
+        if res != None:
+            return res
 
 def getStatus():
     logging.info('Checked status of keystore.')
