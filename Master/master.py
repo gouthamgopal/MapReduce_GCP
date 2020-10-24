@@ -375,10 +375,11 @@ class MasterServer:
         final = json.dumps(result, sort_keys=True, indent=0, separators=(',', ':'))
 
         kv_store = config["kv_client"]["rpc_client"]
-        set_str = 'setOp {0} {1} {2} \n{3}\n'.format(output_path, key, len(result), json.dumps(result))
+        set_str = 'setOp {0} {1} {2} \n{3}\n'.format(output_path, key, len(final), final)
 
         try:
             res = kv_store.mapReduceHandler(set_str)
+            
         except:
             logging.error("Error in file put to key store for final output.")
             print( 'Error in file put to key store for final output.')

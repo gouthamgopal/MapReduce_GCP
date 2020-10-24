@@ -31,6 +31,8 @@ class GCP_API:
         machine_type = "zones/" + zone + "/machineTypes/" + self.config['GCP']['machine_type']
         if name == self.config['kv_store']['kvserver_name']:
             startup_script = open(os.path.join(os.path.dirname(__file__), self.config['kv_store']['kvserver_startup_script_path']), 'r').read()
+        elif name == self.config['master']['master_server']:
+            startup_script = open(os.path.join(os.path.dirname(__file__), self.config['master']['master_startup_script_path']), 'r').read()
         else:
             startup_script = open(os.path.join(os.path.dirname(__file__), self.config['worker']['worker_startup_script_path']), 'r').read()
         
