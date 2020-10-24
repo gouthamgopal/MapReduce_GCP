@@ -35,42 +35,63 @@ def mapperWorker(map_func, index, file_list, mapper_ip, mapper_port):
     print('Inside process creation for mapper method')
     logging.info('Inside process creation for mapper method')
     mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+    print("Inside mapper worker")
+    print(map_func, index, mapper_ip, mapper_port)
+    print(file_list)
     for file_name in file_list[str(index)]:
-        while True:
-            try:
-                if mapper.checkWorkStatus() == 'RUNNING':
-                    time.sleep(2)
-                    continue
-                    
-                elif mapper.checkWorkStatus() == 'IDLE':
-                    mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
-                    print('filename worker: '+file_name)
-                    logging.info('filename worker: '+file_name)
-                    p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
-                    p.start()
-                    p.join()
+        # while True:
+            # try:
+            #     status = 'RUNNING'
+            #     mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+            #     print('filename worker: '+file_name)
+            #     logging.info('filename worker: '+file_name)
+            #     p = Process(target=mapper.worker, args=('map', map_func, file_name, index, ))
+            #     p.start()
+            #     p.join()
+            #     # mapper.worker('map', map_func, file_name, index)
 
-                elif mapper.checkWorkStatus() == 'DONE':
-                    logging.info('Worker {0} returned with status DONE'.format(str(index)))
+            #     while True:
+            #         if mapper.checkWorkStatus() == 'DONE':
+            #             status = 'DONE'
+            #             logging.info('Worker {0} returned with status DONE'.format(str(index)))
+            #             break
+            #         else:
+            #             time.sleep(5)
+
+            #     if status == 'DONE':
+            #         break
+
+            # except Exception as e:
+            #     logging.exception(str(e))
+            #     logging.info('Restarting the mapper process.')
+            #     # mapper.setWorkStatus('IDLE')
+            #     continue
+        try:
+            mapper = xmlrpc.client.ServerProxy("http://{0}:{1}/".format(mapper_ip, str(mapper_port)))
+            mapper.worker('map', map_func, file_name, index)
+
+            while True:
+                print("waiting for mapper")
+                if mapper.checkWorkStatus() == "DONE":
                     break
-                
-            except:
-                logging.info('Restarting the mapper process.')
-                mapper.setWorkStatus('IDLE')
-                continue
+
+        except Exception as e:
+            logging.exception(str(e))
 
 def reducerWorker(red_func, index, file_list, reducer_ip, reducer_port):
     print('Inside proces creation for reducer method')
     logging.info('Inside proces creation for reducer method')
     # reducer = config["worker_client"][str(index)]
-    if red_func == 'wordcount':
-        print('reducer_file_name: '+ file_list[index])
-        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
-            reducer.reducer_helper(red_func, file_list[index], index)
-    elif red_func == 'invertedindex':
-        print('reducer_file_name: '+ file_list[index])
-        with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
-            reducer.reducer_helper(file_list[index], red_func, index)
+    # if red_func == 'wordcount':
+    #     print('reducer_file_name: '+ file_list[index])
+    #     with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
+    #         reducer.reducer_helper(red_func, file_list[index], index)
+    # elif red_func == 'invertedindex':
+    #     print('reducer_file_name: '+ file_list[index])
+    #     with xmlrpc.client.ServerProxy("http://{0}:{1}/".format(reducer_ip, str(reducer_port))) as reducer:
+    #         reducer.reducer_helper(file_list[index], red_func, index)
+    with xmlrpc.client.ServerProxy("http://{0}:{1}".format(reducer_ip, reducer_port)) as reducer:
+        reducer.worker('reduce', red_func, file_list[index], index)
         
 
 class MasterServer:
@@ -159,49 +180,6 @@ class MasterServer:
                 final_map[word_tuple[0]] = [word_tuple[1]]
         # print(final_map)
         return final_map
-    
-    # def worker_func(self, map_func, filename, index):
-    #     global config
-    #     print(config)
-    #     print('Inside worker function calling method')
-    #     logging.info('Inside worker function calling method')
-    #     mapper = config["worker_client"][str(index)]
-    #     if map_func == 'wordcount':
-    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-    #         mapper.map_wordcount(filename, index)
-    #     elif map_func == 'invertedindex':
-    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as mapper:
-    #         mapper.map_invertedindex(filename, index)
-    #         return
-
-    # def mapperWorker(self, map_func, index, file_list):
-    #     print('Inside process creation for mapper method')
-    #     logging.info('Inside process creation for mapper method')
-    #     # mapper = 
-    #     tasks = []
-    #     for file_name in file_list[str(index)]:
-    #         print('filename worker: '+file_name)
-    #         logging.info('filename worker: '+file_name)
-    #         p = Process(target=worker_func, args=(map_func, file_name, index, ))
-    #         p.start()
-    #         tasks.append(p)
-    #     for task in tasks:
-    #         task.join()
-    #     return
-
-    # def reducerWorker(self, red_func, index, file_list):
-    #     global config
-    #     print('Inside proces creation for reducer method')
-    #     logging.info('Inside proces creation for reducer method')
-    #     reducer = config["worker_client"][str(index)]
-    #     if red_func == 'wordcount':
-    #         print('reducer_file_name: '+ file_list[index])
-    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-    #         reducer.reducer_helper(file_list[index], red_func, index)
-    #     elif red_func == 'invertedindex':
-    #         print('reducer_file_name: '+ file_list[index])
-    #         # with xmlrpc.client.ServerProxy("http://localhost:8000/") as reducer:
-    #         reducer.reducer_helper(file_list[index], red_func, index)
     
     def __combine_mapper(self):
         global config
@@ -394,11 +372,22 @@ class MasterServer:
             # [result.append(val) for val in json_data[key]]
             result[key] = json_data[key]
 
-        final = json.dumps(result, sort_keys=True, indent=2, separators=(',', ':')) 
-        with open(output_path, 'w+') as f:
-            f.write(final)
+        final = json.dumps(result, sort_keys=True, indent=0, separators=(',', ':'))
 
+        kv_store = config["kv_client"]["rpc_client"]
+        set_str = 'setOp {0} {1} {2} \n{3}\n'.format(output_path, key, len(result), json.dumps(result))
+
+        try:
+            res = kv_store.mapReduceHandler(set_str)
+        except:
+            logging.error("Error in file put to key store for final output.")
+            print( 'Error in file put to key store for final output.')
+
+        # with open(output_path, 'w+') as f:
+        #     f.write(final)
         logging.info('Completed map reduce function for ' + map_func)
+
+        return final
 
     def destroy_cluster(self, ):
         global config
@@ -410,7 +399,7 @@ class MasterServer:
                 break
 
         logging.info('Destroying created worker nodes from the cluster')
-        for i in self.__worker_instance_count:
+        for i in range(self.__worker_instance_count):
             worker_name = parser["worker"]["name"]+str(i)
             self.gcp_api.delete_instance(parser["GCP"]["project"], parser["GCP"]["zone"], worker_name)
 
